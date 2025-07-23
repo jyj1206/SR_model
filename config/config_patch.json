@@ -5,14 +5,14 @@
 
     "dataset": {
         "mode": "patch",
-        "patch_size": 256,
+        "patch_size": 128,
         "resize_hr": null
     },
 
     "train": {
         "h_path": "trainsets/HR/",
         "l_path": "trainsets/LR/DIV2K_train_LR_bicubic/X2",
-        "batch_size": 32,
+        "batch_size": 16,
         "num_workers": 8,
         "lr": 0.0001,
         "weight_decay": 0.00001,

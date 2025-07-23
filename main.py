@@ -41,9 +41,10 @@ def main():
     model_dir = os.path.join(exp_dir, "models")
     image_dir = os.path.join(exp_dir, "images")
 
-    config_save_path = os.path.join(exp_dir, 'config.json')
+    config_filename = os.path.basename(args.config)
+    config_save_path = os.path.join(exp_dir, config_filename)
     shutil.copy(args.config, config_save_path)
-
+    
     """
         logger & seed setting
     """
@@ -96,7 +97,7 @@ def main():
     current_step = 0
 
     if resume_path:
-        model, optimizer, scheduler, start_epoch, current_step = load_checkpoint(model, optimizer, scheduler, resume_path, device)
+        model, optimizer, scheduler, start_epoch, current_step = load_checkpoint(model, optimizer, scheduler, resume_path)
         logger.info(f"Resumed from checkpoint: {resume_path} (epoch {start_epoch}, step {current_step})")
 
     logger.info("Loss, optimizer, and scheduler are defined successfully.")
