@@ -1,0 +1,17 @@
+results/
+*.pth
+*.ckpt
+
+.vscode/
+.ipynb_checkpoints/
+__pycache__/
+
+*.png
+*.jpg
+*.jpeg
+
+trainsets/*
+testsets/*
+
+!trainsets/README.md
+!testsets/README.md
