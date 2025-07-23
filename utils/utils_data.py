@@ -4,14 +4,12 @@ import numpy as np
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 import utils.utils_image as utils
-import time
+
 
 class PairedTransform:
     def __init__(self, config):
         self.to_tensor = transforms.ToTensor()
-        self.mode = config['dataset']['mode']
         self.patch_size = config['dataset']['patch_size']
-        self.resize_hr = config['dataset']['resize_hr']
         self.scale = config['scale']
 
         # Resize 이미지 저장 경로
@@ -21,49 +19,27 @@ class PairedTransform:
         os.makedirs(self.pre_hr_dir, exist_ok=True)
         os.makedirs(self.pre_lr_dir, exist_ok=True)
 
-    def __call__(self, h_img, l_img, phase='train', h_img_path=None):        
+    def __call__(self, h_img, l_img, phase='train', h_img_path=None):
         if phase == 'train':
-            # Resize 전체 이미지 (mode == 'resize')
-            if self.mode == 'resize':
-                assert h_img_path is not None, "h_img_path must be provided in 'resize' mode."
-                base_name = os.path.splitext(os.path.basename(h_img_path))[0]
-                hr_fname = f"{base_name}_HR{self.resize_hr}.png"
-                lr_size = int(self.resize_hr // self.scale)
-                lr_fname = f"{base_name}_LR{lr_size}.png"
+            H, W, _ = l_img.shape
+            L_size = self.patch_size // self.scale
 
-                hr_path = os.path.join(self.pre_hr_dir, hr_fname)
-                lr_path = os.path.join(self.pre_lr_dir, lr_fname)
+            if H < L_size or W < L_size:
+                raise ValueError(f"LR image size too small for patch cropping: ({H}, {W}) < ({L_size}, {L_size})")
 
-                if os.path.exists(hr_path) and os.path.exists(lr_path):
-                    h_img = cv2.imread(hr_path, cv2.IMREAD_COLOR)
-                    l_img = cv2.imread(lr_path, cv2.IMREAD_COLOR)
-                else:
-                    h_img = cv2.resize(h_img, (self.resize_hr, self.resize_hr), interpolation=cv2.INTER_CUBIC)
-                    l_size = int(self.resize_hr // self.scale)
-                    l_img = cv2.resize(l_img, (l_size, l_size), interpolation=cv2.INTER_CUBIC)
-                    cv2.imwrite(hr_path, h_img)
-                    cv2.imwrite(lr_path, l_img)
+            # 랜덤 크롭
+            rnd_h = np.random.randint(0, H - L_size + 1)
+            rnd_w = np.random.randint(0, W - L_size + 1)
+            l_img = l_img[rnd_h:rnd_h + L_size, rnd_w:rnd_w + L_size, :]
+            h_img = h_img[rnd_h * self.scale:rnd_h * self.scale + self.patch_size,
+                          rnd_w * self.scale:rnd_w * self.scale + self.patch_size, :]
 
-            # Patch 추출 (mode == 'patch')
-            if self.mode == 'patch':
-                H, W, _ = l_img.shape
-                L_size = self.patch_size // self.scale
+            # augmentation 
+            mode = np.random.randint(0, 8)
+            l_img = utils.augment_img(l_img, mode)
+            h_img = utils.augment_img(h_img, mode)
 
-                if H < L_size or W < L_size:
-                    raise ValueError(f"LR image size too small for patch cropping: ({H}, {W}) < ({L_size}, {L_size})")
-
-                rnd_h = np.random.randint(0, H - L_size + 1)
-                rnd_w = np.random.randint(0, W - L_size + 1)
-                l_img = l_img[rnd_h:rnd_h + L_size, rnd_w:rnd_w + L_size, :]
-                h_img = h_img[rnd_h * self.scale:rnd_h * self.scale + self.patch_size,
-                              rnd_w * self.scale:rnd_w * self.scale + self.patch_size, :]
-
-            # 좌우 반전 (augmentation)
-            if np.random.rand() < 0.5:
-                h_img = cv2.flip(h_img, 1)
-                l_img = cv2.flip(l_img, 1)
-
-        # BGR to RGB 변환
+        # BGR → RGB
         h_img = cv2.cvtColor(h_img, cv2.COLOR_BGR2RGB)
         l_img = cv2.cvtColor(l_img, cv2.COLOR_BGR2RGB)
 

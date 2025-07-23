@@ -4,12 +4,10 @@
     "resume": null,
 
     "dataset": {
-        "mode": "patch",
-        "patch_size": 128,
-        "resize_hr": null
+        "patch_size": 128
     },
 
-    "train": {
+    "train": {  
         "h_path": "trainsets/HR/",
         "l_path": "trainsets/LR/DIV2K_train_LR_bicubic/X2",
         "batch_size": 16,
