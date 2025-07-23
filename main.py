@@ -112,7 +112,7 @@ def main():
 
     model.train()
     for epoch in range(start_epoch, epochs):
-        for train_data in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
+        for train_data in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False):
             current_step += 1
 
             H_img = train_data['H'].to(device)

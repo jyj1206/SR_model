@@ -8,6 +8,7 @@ import cv2
 from models.network_sr import SuperResolution
 from utils.utils_image import calculate_psnr, ssim, bgr2ycbcr, tensor2uint
 from utils.utils_chekpoint import load_checkpoint
+from torchsummary import summary
 
 def load_image_pair(lq_path, gt_path):
     lq = cv2.imread(lq_path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
@@ -45,6 +46,8 @@ def main():
         act=act,
         resi=resi
     ).to(device)
+
+    summary(model, input_size=(3, 128, 128))
 
     model, _, _, _, _ = load_checkpoint(model, None, None, args.model_path)
     model.eval()
