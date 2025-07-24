@@ -6,13 +6,17 @@ import numpy as np
 import cv2
 
 from models.network_sr import SuperResolution
-from utils.utils_image import calculate_psnr, ssim, bgr2ycbcr, tensor2uint
+from utils.utils_image import calculate_psnr, ssim, bgr2ycbcr, tensor2uint, imsave
 from utils.utils_chekpoint import load_checkpoint
 from torchsummary import summary
 
 def load_image_pair(lq_path, gt_path):
-    lq = cv2.imread(lq_path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
-    gt = cv2.imread(gt_path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
+    lq = cv2.imread(lq_path, cv2.IMREAD_COLOR)
+    gt = cv2.imread(gt_path, cv2.IMREAD_COLOR)
+
+    lq = cv2.cvtColor(lq, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.
+    gt = cv2.cvtColor(gt, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.
+    
     lq_tensor = torch.from_numpy(lq.transpose(2, 0, 1)).unsqueeze(0).float()
     gt_tensor = torch.from_numpy(gt.transpose(2, 0, 1)).unsqueeze(0).float()
     return lq_tensor, gt_tensor, lq, gt
@@ -23,6 +27,8 @@ def main():
     parser.add_argument('--model_path', type=str, required=True, help='Path to .pth model checkpoint')
     parser.add_argument('--folder_lq', type=str, required=True, help='Low-resolution image folder')
     parser.add_argument('--folder_gt', type=str, required=True, help='Ground-truth image folder')
+    parser.add_argument('--save_dir', type=str, default='predict', help='Directory to save predicted images')
+
     args = parser.parse_args()
 
     # Load config
@@ -72,6 +78,13 @@ def main():
             sr = tensor2uint(output)
             gt = tensor2uint(gt_tensor)
 
+            subfolder_name = os.path.basename(os.path.normpath(args.folder_lq))
+            save_path = os.path.join(args.save_dir, subfolder_name)
+            os.makedirs(save_path, exist_ok=True)
+
+            save_img_path = os.path.join(save_path, fname)
+            imsave(sr, save_img_path)
+            
             psnr = calculate_psnr(sr, gt, border=scale)
             ssim_val = ssim(sr, gt)
 
@@ -93,6 +106,37 @@ def main():
     print(f"Average PSNR_Y: {psnr_y_total / count:.2f} dB")
     print(f"Average SSIM:   {ssim_total / count:.4f}")
     print(f"Average SSIM_Y: {ssim_y_total / count:.4f}")
+
+def tile_based_inference(model, lq_tensor, tile_size, tile_overlap, scale):
+    b, c, h, w = lq_tensor.size()
+    tile = tile_size
+    overlap = tile_overlap
+    stride = tile - overlap
+    output = torch.zeros((b, c, h * scale, w * scale), device=lq_tensor.device)
+    weight_map = torch.zeros_like(output)
+
+    for y in range(0, h, stride):
+        for x in range(0, w, stride):
+            y_end = min(y + tile, h)
+            x_end = min(x + tile, w)
+            y_start = max(y_end - tile, 0)
+            x_start = max(x_end - tile, 0)
+
+            lq_patch = lq_tensor[:, :, y_start:y_end, x_start:x_end]
+            with torch.no_grad():
+                sr_patch = model(lq_patch).clamp(0, 1)
+
+            out_y_start = y_start * scale
+            out_y_end = y_end * scale
+            out_x_start = x_start * scale
+            out_x_end = x_end * scale
+
+            output[:, :, out_y_start:out_y_end, out_x_start:out_x_end] += sr_patch
+            weight_map[:, :, out_y_start:out_y_end, out_x_start:out_x_end] += 1.0
+
+    output /= weight_map
+    return output
+
 
 if __name__ == '__main__':
     main()
